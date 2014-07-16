@@ -1,0 +1,8 @@
+*.beam
+ebin
+.eunit
+*~
+erl_crash.dump
+deps
+.rebar/*
+.DS_Store
