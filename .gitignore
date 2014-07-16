@@ -5,4 +5,5 @@ ebin
 erl_crash.dump
 deps
 .rebar/*
+app.config
 .DS_Store

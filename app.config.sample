@@ -1,0 +1,8 @@
+[{
+    pgpool, [
+        {pools, [
+            % {poolname, poolsize, db_url}
+            % {poolname, 10, "pg://db_user:db_pass@db_host/db_name?encoding=UTF-8"}
+            {sonitech, 10, "pg://db_user:db_pass@localhost/sonitech_development?encoding=UTF-8"}
+        ]}]
+}].
