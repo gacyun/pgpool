@@ -1,0 +1,9 @@
+{application, pgpool, [
+    {description, "A Pool of PostgreSQL Client"},
+    {vsn, "0.1.0"},
+    {applications, [kernel, stdlib, sasl, crypto]},
+    {modules, [pgpool, pgpool_worker]},
+    {registered, [pgpool]},
+    {mod, {pgpool, []}},
+    {env, []}
+]}.
