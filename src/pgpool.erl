@@ -2,7 +2,7 @@
 -behaviour(application).
 -behaviour(supervisor).
 
--export([start/0, stop/0, start/2, stop/1, init/1, squery/2, equery/3, equery/4, execute_batch/2, execute_batch/3, status/1]).
+-export([start/0, stop/0, start/2, stop/1, init/1, parse/2, parse/3, parse/4, squery/2, equery/3, equery/4, execute_batch/2, execute_batch/3, status/1]).
 
 
 % -define(DEBUG_QUERY_LEVEL, io).
@@ -28,9 +28,11 @@
 start() -> application:start(?MODULE).
 stop()	-> application:stop(?MODULE).
 
+
 start(_Type, _Args) ->
 	supervisor:start_link({local, pgpool_sup}, ?MODULE, []).
 stop(_State) -> ok.
+
 
 init([]) ->
 	{ok, Pools} = application:get_env(pgpool, pools),
@@ -54,6 +56,30 @@ init([]) ->
 	PoolSpecs = lists:map(Fun, Pools),
 	{ok, {{one_for_one, 10000, 10}, PoolSpecs}}.
 
+
+parse(PoolName, Sql) ->
+	parse(PoolName, "", Sql, []).
+
+parse(PoolName, Sql, Types) ->
+	parse(PoolName, "", Sql, Types).
+
+parse(PoolName, Name, Sql, Types) ->
+	Worker = poolboy:checkout(PoolName),
+	try
+		R = gen_server:call(Worker, {parse, Name, Sql, Types}),
+		ok = poolboy:checkin(PoolName, Worker),
+		R
+	catch
+		exit:{timeout, {gen_server, call, [Pid, {parse, Name, Sql, Types}, _Timeout]}} ->
+			io:format("Parse too slow!! ~p~n", [Sql]),
+			exit(Pid, kill),
+			{error, execution_timeout};
+		Exit:Reason ->
+			exit(Worker, kill),
+			{Exit, Reason}
+	end.
+
+
 squery(PoolName, Sql) ->
 	Worker = poolboy:checkout(PoolName),
 	try
@@ -72,6 +98,7 @@ squery(PoolName, Sql) ->
 			exit(Worker, kill),
 			{Exit, Reason}
 	end.
+
 
 equery(PoolName, Stmt, Params) ->
 	equery(PoolName, Stmt, Params, 5000).
@@ -99,6 +126,7 @@ equery(PoolName, Stmt, Params, Timeout) ->
 			{Exit, Reason}
 	end.
 
+
 execute_batch(PoolName, Batch) ->
 	execute_batch(PoolName, Batch, 5000).
 
@@ -113,11 +141,8 @@ execute_batch(PoolName, Batch, Timeout) ->
 		?DEBUG_QUERY("I ~p ~p", [Worker, Batch]), % after checkin
 		R
 	catch
-		exit:{timeout, {gen_server, call, [_Pid, {execute_batch, Batch}, _Timeout]}} ->
-			io:format("INSERT too slow!! ~p~n", [Batch]),
-			gen_server:cast(Worker, stop),
-			{error, execution_timeout};
-		exit:{timeout, {gen_server, call, [Pid, {execute_batch, _Batch}, _Timeout]}} ->
+		exit:{timeout, {gen_server, call, [Pid, {execute_batch, Batch}, _Timeout]}} ->
+			io:format("Batch too slow!! ~p~n", [Batch]),
 			exit(Pid, kill),
 			{error, execution_timeout};
 		Exit:Reason ->
