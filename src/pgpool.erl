@@ -2,7 +2,7 @@
 -behaviour(application).
 -behaviour(supervisor).
 
--export([start/0, stop/0, start/2, stop/1, init/1, squery/2, equery/3, equery/4, status/1]).
+-export([start/0, stop/0, start/2, stop/1, init/1, squery/2, equery/3, equery/4, execute_batch/2, execute_batch/3, status/1]).
 
 
 % -define(DEBUG_QUERY_LEVEL, io).
@@ -98,6 +98,33 @@ equery(PoolName, Stmt, Params, Timeout) ->
 			exit(Worker, kill),
 			{Exit, Reason}
 	end.
+
+execute_batch(PoolName, Batch) ->
+	execute_batch(PoolName, Batch, 5000).
+
+execute_batch(PoolName, Batch, Timeout) ->
+	?DEBUG_QUERY_NOW,
+	?DEBUG_QUERY("B ~p ~p", [self()]), % before checkout
+	Worker = poolboy:checkout(PoolName),
+	?DEBUG_QUERY("O ~p ~p ~p", [Worker, Batch]), % after checkout
+	try
+		R = gen_server:call(Worker, {execute_batch, Batch}, Timeout),
+		ok = poolboy:checkin(PoolName, Worker),
+		?DEBUG_QUERY("I ~p ~p", [Worker, Batch]), % after checkin
+		R
+	catch
+		exit:{timeout, {gen_server, call, [_Pid, {execute_batch, Batch}, _Timeout]}} ->
+			io:format("INSERT too slow!! ~p~n", [Batch]),
+			gen_server:cast(Worker, stop),
+			{error, execution_timeout};
+		exit:{timeout, {gen_server, call, [Pid, {execute_batch, _Batch}, _Timeout]}} ->
+			exit(Pid, kill),
+			{error, execution_timeout};
+		Exit:Reason ->
+			exit(Worker, kill),
+			{Exit, Reason}
+	end.
+
 
 status(PoolName) ->
 	case whereis(PoolName) of
