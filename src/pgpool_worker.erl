@@ -13,7 +13,7 @@ init(Args) ->
 	% process_flag(trap_exit, true),
 	DB_URL = proplists:get_value(db_url, Args),
 	{pg, Host, Username, Password, Opts} = pgpool_utils:parse_db_url(DB_URL),
-	case pgsql:connect(Host, Username, Password, Opts) of
+	case epgsql:connect(Host, Username, Password, Opts) of
 		{ok, Conn} ->
 			{ok, #state{conn = Conn}};
 		{error, Reason} ->
@@ -21,16 +21,16 @@ init(Args) ->
 	end.
 
 handle_call({parse, Name, Sql, Types}, _From, #state{conn=Conn}=State) ->
-	{reply, pgsql:parse(Conn, Name, Sql, Types), State};
+	{reply, epgsql:parse(Conn, Name, Sql, Types), State};
 
 handle_call({squery, Sql}, _From, #state{conn=Conn}=State) ->
-	{reply, pgsql:squery(Conn, Sql), State};
+	{reply, epgsql:squery(Conn, Sql), State};
 
 handle_call({equery, Stmt, Params}, _From, #state{conn=Conn}=State) ->
-	{reply, pgsql:equery(Conn, Stmt, Params), State};
+	{reply, epgsql:equery(Conn, Stmt, Params), State};
 
 handle_call({execute_batch, Batch}, _From, #state{conn=Conn}=State) ->
-	{reply, pgsql:execute_batch(Conn, Batch), State};
+	{reply, epgsql:execute_batch(Conn, Batch), State};
 
 
 handle_call(_Request, _From, State) ->
@@ -49,7 +49,7 @@ handle_info(_Info, State) ->
 	{noreply, State}.
 
 terminate(_Reason, #state{conn=Conn}) ->
-	pgsql:close(Conn),
+	epgsql:close(Conn),
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->
